@@ -12,12 +12,16 @@ class User(AbstractBaseUser, PermissionsMixin):
         ADMIN = "admin", "Admin"
 
     email = models.EmailField(
-        unique=True
+        unique=True,
+        db_index=True,
     )
+
+    phone_number = models.CharField(max_length=11,null=True )
 
     role = models.CharField(
         max_length=20,
-        choices=Role.choices
+        choices=Role.choices,
+        default=Role.FREELANCER,
     )
 
     is_active = models.BooleanField(
@@ -48,6 +52,9 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.email
+    
+    class Meta:
+        ordering = ["-created_at"]
     
 class FreelancerProfile(models.Model):
     user = models.OneToOneField(
