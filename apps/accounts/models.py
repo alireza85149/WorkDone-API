@@ -55,6 +55,15 @@ class User(AbstractBaseUser, PermissionsMixin):
     
     class Meta:
         ordering = ["-created_at"]
+
+class Skill(models.Model):
+    name = models.CharField(max_length=30,  unique=True)
+
+    def __str__(self):
+        return self.name
+    
+    class Meta:
+        ordering = ['name']
     
 class FreelancerProfile(models.Model):
     user = models.OneToOneField(
@@ -68,10 +77,7 @@ class FreelancerProfile(models.Model):
 
     bio = models.TextField(blank=True)
 
-    skills = models.TextField(
-        blank=True,
-        help_text="Comma separated skills"
-    )
+    skills = models.ManyToManyField(Skill, related_name='freelancers', blank= True)
 
     hourly_rate = models.DecimalField(
         max_digits=10,
