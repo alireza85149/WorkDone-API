@@ -48,6 +48,15 @@ class Project(models.Model):
         auto_now=True
     )
 
+    location = models.CharField(
+        max_length=100,
+        blank=True
+    )
+
+    is_remote = models.BooleanField(
+        default=True
+    )
+
     class Meta:
         ordering = ["-created_at"]
 
