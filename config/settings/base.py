@@ -42,7 +42,8 @@ INSTALLED_APPS = [
     'django_filters',
     'apps.accounts',
     'apps.projects',
-    'apps.proposals'
+    'apps.proposals',
+    'apps.contract',
 ]
 
 MIDDLEWARE = [
