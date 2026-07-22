@@ -36,7 +36,7 @@ class Contract(models.Model):
         decimal_places=2
     )
 
-    deadline = models.DateField()
+    deadline = models.DateTimeField()
 
     status = models.CharField(
         max_length=20,
