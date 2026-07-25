@@ -1,10 +1,11 @@
-from rest_framework import status
+from rest_framework import status, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .permissions import IsContractParticipant, IsEmpoloyerOfContract
 from apps.contracts.models import Contract
 from apps.projects.models import Project
+from apps.accounts.models import User
 from django.shortcuts import get_object_or_404
 from .serializers import ContractSerializer
 from django.db import transaction
@@ -52,3 +53,22 @@ class CancelContractView(APIView):
         serializer = ContractSerializer(contract)
         return Response({'message': 'the contract canceled', 'contract':serializer.data})
 
+class RetrieveContractView(generics.RetrieveAPIView):
+
+    serializer_class = ContractSerializer
+    permission_classes = [IsAuthenticated, IsContractParticipant]
+
+    queryset = Contract.objects.all()
+
+
+class ListContractView(generics.ListAPIView):
+
+    serializer_class = ContractSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if self.request.user.role == User.Role.EMPLOYER:
+            return Contract.objects.filter(employer = self.request.user.employer_profile)
+        elif self.request.user.role == User.Role.FREELANCER:
+            return Contract.objects.filter(freelancer = self.request.user.freelancer_profile)
+        return Contract.objects.none()
