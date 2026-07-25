@@ -31,7 +31,7 @@ class ProjectListCreateView(generics.ListCreateAPIView):
 class ProjectDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ProjectSerializer
     def get_permissions(self):
-        if self.method == 'GET':
+        if self.request.method == 'GET':
             return [IsAuthenticated]
         return [IsAuthenticated, IsEmployer, IsProjectOwner]
     queryset = Project.objects.all()

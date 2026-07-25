@@ -2,7 +2,7 @@ from rest_framework import status, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from .permissions import IsContractParticipant, IsEmpoloyerOfContract
+from .permissions import IsContractParticipant, IsEmployerOfContract
 from apps.contracts.models import Contract
 from apps.projects.models import Project
 from apps.accounts.models import User
@@ -16,7 +16,7 @@ class CompleteContractView(APIView):
         IsEmployerOfContract,
     ]
 
-    @transaction.Atomic
+    @transaction.atomic
     def patch(self, request, pk):
         contract = get_object_or_404(Contract, pk = pk)
         self.check_object_permissions(request, contract)
@@ -37,7 +37,7 @@ class CancelContractView(APIView):
         IsContractParticipant
     ]
 
-    @transaction.Atomic
+    @transaction.atomic
     def patch(self, request, pk):
         contract = get_object_or_404(Contract, pk = pk)
         self.check_object_permissions(request, contract)

@@ -1,5 +1,5 @@
 from rest_framework.permissions import BasePermission
-from projects.models import Project
+from apps.projects.models import Project
 class IsFreelancer(BasePermission):
     def has_permission(self, request, view):
         return request.user.role == 'freelancer'
