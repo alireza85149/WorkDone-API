@@ -7,7 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from .permissions import IsFreelancer, IsProposalOwner, IsProjectOwner
 from apps.proposals.models import Proposal
 from django.shortcuts import get_object_or_404
-from apps.contract.models  import Contract
+from apps.contracts.models  import Contract
 from django.utils import timezone
 from datetime import timedelta
 from django.db import transaction
