@@ -9,7 +9,7 @@ from apps.submissions.models import Submission
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.db import transaction
-
+from apps.projects.models import Project
 class CreateSubmission(generics.CreateAPIView):
     serializer_class = SubmissionSerializer
     permission_classes = [
@@ -91,15 +91,34 @@ class ApproveSubmissionView(APIView):
             status=status.HTTP_200_OK,
         )
 
-class RequestRevisionSubmission(generics.UpdateAPIView):
-    serializer_class = SubmissionSerializer
+class RequestRevisionSubmissionView(APIView):
     permission_classes = [
         IsAuthenticated,
-        IsEmployerOfContract
-        ]
+        IsEmployerOfContract,
+    ]
 
-    def perform_update(self, serializer):
+    @transaction.atomic
+    def patch(self, request, pk):
 
-        serializer.save(
-            status=Submission.Status.REVISION
+        submission = get_object_or_404(Submission, pk=pk)
+
+        self.check_object_permissions(request, submission.contract)
+
+        if submission.status != Submission.Status.PENDING:
+            return Response(
+                {"message": "This submission has already been processed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        submission.status = Submission.Status.REVISION
+        submission.save()
+
+        serializer = SubmissionSerializer(submission)
+
+        return Response(
+            {
+                "message": "Revision requested successfully.",
+                "submission": serializer.data,
+            },
+            status=status.HTTP_200_OK,
         )
