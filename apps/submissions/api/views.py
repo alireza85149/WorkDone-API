@@ -1,6 +1,6 @@
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
-from .serializers import SubmissionSerialzer
+from .serializers import SubmissionSerializer
 from .permissions import IsEmployerOfContract, IsfreelancerOfContract, IsContractParticipant
 from apps.contracts.models import Contract
 from django.shortcuts import get_object_or_404
@@ -8,7 +8,7 @@ from rest_framework.exceptions import ValidationError
 from apps.submissions.models import Submission
 
 class CreateSubmission(generics.CreateAPIView):
-    serializer_class = SubmissionSerialzer
+    serializer_class = SubmissionSerializer
     permission_classes = [
         IsAuthenticated,
         IsfreelancerOfContract
@@ -28,7 +28,7 @@ class CreateSubmission(generics.CreateAPIView):
         serializer.save(contract = contract)
 
 class ListSubmissions(generics.ListAPIView):
-    serializer_class = SubmissionSerialzer
+    serializer_class = SubmissionSerializer
     permission_classes = [
         IsAuthenticated,
         IsEmployerOfContract
@@ -36,23 +36,40 @@ class ListSubmissions(generics.ListAPIView):
     
     def get_queryset(self):
         contract = get_object_or_404(Contract, pk = self.kwargs['contract_id'])
+        self.check_object_permissions(self.request, contract)
         return contract.submissions.all()
 
 class RetrieveSubmission(generics.RetrieveAPIView):
-    serializer_class = SubmissionSerialzer
+    serializer_class = SubmissionSerializer
     permission_classes = [
         IsAuthenticated,
         IsContractParticipant
         ]
     
     queryset = Submission.objects.all()
-    
+
 class ApproveSubmission(generics.UpdateAPIView):
-    serializer_class = SubmissionSerialzer
+    serializer_class = SubmissionSerializer
     permission_classes = [
         IsAuthenticated,
-        IsContractParticipant
+        IsEmployerOfContract
         ]
-    
+
+    def perform_update(self, serializer):
+
+        serializer.save(
+            status=Submission.Status.APPROVED
+        )
 
 class RequestRevisionSubmission(generics.UpdateAPIView):
+    serializer_class = SubmissionSerializer
+    permission_classes = [
+        IsAuthenticated,
+        IsEmployerOfContract
+        ]
+
+    def perform_update(self, serializer):
+
+        serializer.save(
+            status=Submission.Status.REVISION
+        )
