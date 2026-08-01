@@ -1,4 +1,4 @@
-from rest_framework import generics
+from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from .serializers import SubmissionSerializer
 from .permissions import IsEmployerOfContract, IsfreelancerOfContract, IsContractParticipant
@@ -6,6 +6,9 @@ from apps.contracts.models import Contract
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import ValidationError
 from apps.submissions.models import Submission
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from django.db import transaction
 
 class CreateSubmission(generics.CreateAPIView):
     serializer_class = SubmissionSerializer
@@ -48,17 +51,44 @@ class RetrieveSubmission(generics.RetrieveAPIView):
     
     queryset = Submission.objects.all()
 
-class ApproveSubmission(generics.UpdateAPIView):
-    serializer_class = SubmissionSerializer
+class ApproveSubmissionView(APIView):
     permission_classes = [
         IsAuthenticated,
-        IsEmployerOfContract
-        ]
+        IsEmployerOfContract,
+    ]
 
-    def perform_update(self, serializer):
+    @transaction.atomic
+    def patch(self, request, pk):
 
-        serializer.save(
-            status=Submission.Status.APPROVED
+        submission = get_object_or_404(Submission, pk=pk)
+
+        self.check_object_permissions(request, submission.contract)
+
+        if submission.status != Submission.Status.PENDING:
+            return Response(
+                {"message": "This submission has already been processed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        submission.status = Submission.Status.APPROVED
+        submission.save()
+
+        contract = submission.contract
+        contract.status = Contract.Status.COMPLETED
+        contract.save()
+
+        project = contract.project
+        project.status = Project.Status.COMPLETED
+        project.save()
+
+        serializer = SubmissionSerializer(submission)
+
+        return Response(
+            {
+                "message": "Submission approved successfully.",
+                "submission": serializer.data,
+            },
+            status=status.HTTP_200_OK,
         )
 
 class RequestRevisionSubmission(generics.UpdateAPIView):
