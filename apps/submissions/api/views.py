@@ -5,6 +5,7 @@ from .permissions import IsEmployerOfContract, IsfreelancerOfContract, IsContrac
 from apps.contracts.models import Contract
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import ValidationError
+from apps.submissions.models import Submission
 
 class CreateSubmission(generics.CreateAPIView):
     serializer_class = SubmissionSerialzer
@@ -26,10 +27,32 @@ class CreateSubmission(generics.CreateAPIView):
 
         serializer.save(contract = contract)
 
-# class ListSubmissions(generics.ListAPIView):
+class ListSubmissions(generics.ListAPIView):
+    serializer_class = SubmissionSerialzer
+    permission_classes = [
+        IsAuthenticated,
+        IsEmployerOfContract
+        ]
+    
+    def get_queryset(self):
+        contract = get_object_or_404(Contract, pk = self.kwargs['contract_id'])
+        return contract.submissions.all()
 
+class RetrieveSubmission(generics.RetrieveAPIView):
+    serializer_class = SubmissionSerialzer
+    permission_classes = [
+        IsAuthenticated,
+        IsContractParticipant
+        ]
+    
+    queryset = Submission.objects.all()
+    
+class ApproveSubmission(generics.UpdateAPIView):
+    serializer_class = SubmissionSerialzer
+    permission_classes = [
+        IsAuthenticated,
+        IsContractParticipant
+        ]
+    
 
-# class ApproveSubmission(generics.UpdateAPIView):
-
-
-# class RequestRevisionSubmission(generics.UpdateAPIView):
+class RequestRevisionSubmission(generics.UpdateAPIView):
