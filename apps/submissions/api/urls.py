@@ -8,7 +8,7 @@ from .views import RequestRevisionSubmission
 urlpatterns = [
     path('contracts/<int:contract_id>/create-submission/', CreateSubmission.as_view()),
     path('contracts/<int:contract_id>/submissions/', ListSubmissions.as_view()),
-    path('submission/<int:pk>/retrieve/', RetrieveSubmission.as_view()),
+    path('submission/<int:pk>/', RetrieveSubmission.as_view()),
     path('submission/<int:pk>/approve/', ApproveSubmission.as_view()),
     path('submission/<int:pk>/request-revision/', RequestRevisionSubmission.as_view()),
 ]
