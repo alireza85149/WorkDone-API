@@ -5,8 +5,8 @@ from django.shortcuts import get_object_or_404
 
 from apps.contracts.models import Contract
 from apps.reviews.models import Review
-from apps.reviews.serializers import ReviewSerializer
-from apps.reviews.permissions import IsReviewOwner
+from apps.reviews.api.serializers import ReviewSerializer
+from apps.reviews.api.permissions import IsReviewOwner
 
 
 class ContractReviewListCreateView(generics.ListCreateAPIView):
