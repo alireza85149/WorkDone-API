@@ -82,3 +82,4 @@ This project focuses on gaining practical experience with:
 * Production-ready backend architecture
 
 > **Note:** This project is being developed as a portfolio project to simulate the architecture and workflow of a real-world freelancing platform while following industry best practices.
+
