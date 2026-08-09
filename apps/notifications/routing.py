@@ -1,11 +1,12 @@
 from django.urls import path
-
 from .consumers import NotificationConsumer
-
+from .middleware import JWTAuthMiddleware
 
 websocket_urlpatterns = [
     path(
         "ws/notifications/",
-        NotificationConsumer.as_asgi(),
+        JWTAuthMiddleware(
+            NotificationConsumer.as_asgi()
+        ),
     ),
 ]
