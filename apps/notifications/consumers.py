@@ -25,3 +25,9 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
                 self.user_group_name,
                 self.channel_name
             )
+            
+    async def notification_message(self, event):
+        await self.send_json({
+            "type": "notification",
+            "message": event["message"],
+        })
