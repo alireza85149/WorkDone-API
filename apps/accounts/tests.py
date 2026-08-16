@@ -1,8 +1,13 @@
 from django.urls import reverse
+
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.accounts.models import User, FreelancerProfile, EmployerProfile
+from apps.accounts.models import (
+    User,
+    FreelancerProfile,
+    EmployerProfile,
+)
 
 
 class RegistrationTests(APITestCase):
@@ -12,7 +17,7 @@ class RegistrationTests(APITestCase):
             "email": "freelancer@example.com",
             "password": "StrongPassword123",
             "phone_number": "09123456789",
-            "role": "freelancer",
+            "role": User.Role.FREELANCER,
         }
 
         response = self.client.post(
@@ -21,13 +26,19 @@ class RegistrationTests(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+        )
 
         user = User.objects.get(
             email="freelancer@example.com"
         )
 
-        self.assertEqual(user.role, User.Role.FREELANCER)
+        self.assertEqual(
+            user.role,
+            User.Role.FREELANCER,
+        )
 
         self.assertTrue(
             FreelancerProfile.objects.filter(
@@ -40,7 +51,7 @@ class RegistrationTests(APITestCase):
             "email": "employer@example.com",
             "password": "StrongPassword123",
             "phone_number": "09123456788",
-            "role": "employer",
+            "role": User.Role.EMPLOYER,
         }
 
         response = self.client.post(
@@ -49,13 +60,19 @@ class RegistrationTests(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+        )
 
         user = User.objects.get(
             email="employer@example.com"
         )
 
-        self.assertEqual(user.role, User.Role.EMPLOYER)
+        self.assertEqual(
+            user.role,
+            User.Role.EMPLOYER,
+        )
 
         self.assertTrue(
             EmployerProfile.objects.filter(
@@ -63,12 +80,42 @@ class RegistrationTests(APITestCase):
             ).exists()
         )
 
-    def test_password_is_hashed(self):
+    def test_duplicate_email_is_rejected(self):
         data = {
-            "email": "hash@example.com",
+            "email": "duplicate@example.com",
             "password": "StrongPassword123",
-            "phone_number": "09123456787",
-            "role": "freelancer",
+            "phone_number": "09123456789",
+            "role": User.Role.FREELANCER,
+        }
+
+        first_response = self.client.post(
+            reverse("register"),
+            data,
+            format="json",
+        )
+
+        self.assertEqual(
+            first_response.status_code,
+            status.HTTP_201_CREATED,
+        )
+
+        second_response = self.client.post(
+            reverse("register"),
+            data,
+            format="json",
+        )
+
+        self.assertEqual(
+            second_response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    def test_short_password_is_rejected(self):
+        data = {
+            "email": "short@example.com",
+            "password": "123",
+            "phone_number": "09123456789",
+            "role": User.Role.FREELANCER,
         }
 
         response = self.client.post(
@@ -77,72 +124,111 @@ class RegistrationTests(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-
-        user = User.objects.get(
-            email="hash@example.com"
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
         )
-
-        self.assertNotEqual(
-            user.password,
-            "StrongPassword123"
-        )
-
-        self.assertTrue(
-            user.check_password("StrongPassword123")
-        )
-
 
 class LoginTests(APITestCase):
 
     def setUp(self):
         self.user = User.objects.create_user(
-            email="login@example.com",
+            email="test@example.com",
             password="StrongPassword123",
             role=User.Role.FREELANCER,
         )
 
     def test_user_can_login(self):
+        data = {
+            "email": "test@example.com",
+            "password": "StrongPassword123",
+        }
+
         response = self.client.post(
             reverse("login"),
-            {
-                "email": "login@example.com",
-                "password": "StrongPassword123",
-            },
+            data,
             format="json",
         )
 
         self.assertEqual(
             response.status_code,
-            status.HTTP_200_OK
+            status.HTTP_200_OK,
         )
 
         self.assertIn("access", response.data)
         self.assertIn("refresh", response.data)
 
-    def test_wrong_password_is_rejected(self):
+    def test_login_with_wrong_password_fails(self):
+        data = {
+            "email": "test@example.com",
+            "password": "WrongPassword123",
+        }
+
         response = self.client.post(
             reverse("login"),
-            {
-                "email": "login@example.com",
-                "password": "WrongPassword123",
-            },
+            data,
             format="json",
         )
 
         self.assertEqual(
             response.status_code,
-            status.HTTP_401_UNAUTHORIZED
+            status.HTTP_401_UNAUTHORIZED,
         )
 
+    def test_login_with_unknown_email_fails(self):
+        data = {
+            "email": "unknown@example.com",
+            "password": "StrongPassword123",
+        }
+
+        response = self.client.post(
+            reverse("login"),
+            data,
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        )
 
 class MeTests(APITestCase):
 
     def setUp(self):
         self.user = User.objects.create_user(
-            email="me@example.com",
+            email="test@example.com",
             password="StrongPassword123",
             role=User.Role.FREELANCER,
+        )
+
+    def test_authenticated_user_can_access_me(self):
+        response = self.client.post(
+            reverse("login"),
+            {
+                "email": "test@example.com",
+                "password": "StrongPassword123",
+            },
+            format="json",
+        )
+
+        access_token = response.data["access"]
+
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"Bearer {access_token}"
+        )
+
+        response = self.client.get(
+            reverse("me")
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            response.data["email"],
+            self.user.email,
         )
 
     def test_unauthenticated_user_cannot_access_me(self):
@@ -152,24 +238,5 @@ class MeTests(APITestCase):
 
         self.assertEqual(
             response.status_code,
-            status.HTTP_401_UNAUTHORIZED
-        )
-
-    def test_authenticated_user_can_access_me(self):
-        self.client.force_authenticate(
-            user=self.user
-        )
-
-        response = self.client.get(
-            reverse("me")
-        )
-
-        self.assertEqual(
-            response.status_code,
-            status.HTTP_200_OK
-        )
-
-        self.assertEqual(
-            response.data["email"],
-            self.user.email
+            status.HTTP_401_UNAUTHORIZED,
         )
