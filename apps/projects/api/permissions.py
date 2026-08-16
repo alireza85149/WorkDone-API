@@ -8,5 +8,5 @@ class IsEmployer(BasePermission):
         
 class IsProjectOwner(BasePermission):
 
-    def has_object_permission(self, request, view, object):
-        return request.user.emplyer_profile == object.employer
+    def has_object_permission(self, request, view, obj):
+        return request.user.employer_profile == obj.employer
