@@ -1,10 +1,10 @@
-from datetime import date, timedelta
+from datetime import date
 
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.accounts.models import User
+from apps.accounts.models import User, EmployerProfile, FreelancerProfile
 from apps.projects.models import Project
 
 
@@ -18,6 +18,11 @@ class ProjectTests(APITestCase):
             role=User.Role.EMPLOYER,
         )
 
+        self.employer_profile = EmployerProfile.objects.create(
+            user=self.employer,
+            company_name="Test Company",
+        )
+
         # Freelancer
         self.freelancer = User.objects.create_user(
             email="freelancer@example.com",
@@ -25,52 +30,49 @@ class ProjectTests(APITestCase):
             role=User.Role.FREELANCER,
         )
 
-        # Project owned by employer
-        self.project = Project.objects.create(
-            employer=self.employer.employer_profile,
-            title="Build a REST API",
-            description="Create a Django REST API.",
-            budget=1000,
-            deadline=date.today() + timedelta(days=30),
+        self.freelancer_profile = FreelancerProfile.objects.create(
+            user=self.freelancer,
+            first_name="John",
+            last_name="Doe",
         )
 
-        self.project_list_url = reverse("project-list")
-
-        self.project_detail_url = reverse(
-            "project-detail",
-            kwargs={"pk": self.project.pk},
-        )
+        self.list_url = reverse("project-list-create")
 
     def authenticate(self, user):
-        self.client.force_authenticate(user=user)
-
-    def test_authenticated_user_can_list_projects(self):
-        self.authenticate(self.freelancer)
-
-        response = self.client.get(self.project_list_url)
+        response = self.client.post(
+            reverse("login"),
+            {
+                "email": user.email,
+                "password": "StrongPassword123",
+            },
+            format="json",
+        )
 
         self.assertEqual(
             response.status_code,
             status.HTTP_200_OK,
         )
 
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"Bearer {response.data['access']}"
+        )
+
+    def project_data(self):
+        return {
+            "title": "Build a Django API",
+            "description": "Build a REST API for a freelancing platform.",
+            "budget": "1500.00",
+            "deadline": "2026-12-31",
+            "location": "Remote",
+            "is_remote": True,
+        }
+
     def test_employer_can_create_project(self):
         self.authenticate(self.employer)
 
-        data = {
-            "title": "Build a Django Website",
-            "description": "Create a professional website.",
-            "budget": "1500.00",
-            "deadline": str(
-                date.today() + timedelta(days=30)
-            ),
-            "is_remote": True,
-            "location": "",
-        }
-
         response = self.client.post(
-            self.project_list_url,
-            data,
+            self.list_url,
+            self.project_data(),
             format="json",
         )
 
@@ -81,33 +83,27 @@ class ProjectTests(APITestCase):
 
         self.assertEqual(
             Project.objects.count(),
-            2,
+            1,
         )
 
-        project = Project.objects.get(
-            title="Build a Django Website"
-        )
+        project = Project.objects.first()
 
         self.assertEqual(
             project.employer,
-            self.employer.employer_profile,
+            self.employer_profile,
+        )
+
+        self.assertEqual(
+            project.title,
+            "Build a Django API",
         )
 
     def test_freelancer_cannot_create_project(self):
         self.authenticate(self.freelancer)
 
-        data = {
-            "title": "Unauthorized Project",
-            "description": "This should fail.",
-            "budget": "500.00",
-            "deadline": str(
-                date.today() + timedelta(days=30)
-            ),
-        }
-
         response = self.client.post(
-            self.project_list_url,
-            data,
+            self.list_url,
+            self.project_data(),
             format="json",
         )
 
@@ -116,12 +112,60 @@ class ProjectTests(APITestCase):
             status.HTTP_403_FORBIDDEN,
         )
 
-    def test_authenticated_user_can_retrieve_project(self):
+    def test_unauthenticated_user_cannot_create_project(self):
+        response = self.client.post(
+            self.list_url,
+            self.project_data(),
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    def test_authenticated_user_can_list_projects(self):
+        Project.objects.create(
+            employer=self.employer_profile,
+            title="Existing Project",
+            description="Test description",
+            budget="1000.00",
+            deadline=date(2026, 12, 31),
+        )
+
         self.authenticate(self.freelancer)
 
         response = self.client.get(
-            self.project_detail_url
+            self.list_url
         )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            1,
+        )
+
+    def test_project_owner_can_retrieve_project(self):
+        project = Project.objects.create(
+            employer=self.employer_profile,
+            title="My Project",
+            description="Test description",
+            budget="1000.00",
+            deadline=date(2026, 12, 31),
+        )
+
+        self.authenticate(self.employer)
+
+        url = reverse(
+            "project-detail",
+            kwargs={"pk": project.pk},
+        )
+
+        response = self.client.get(url)
 
         self.assertEqual(
             response.status_code,
@@ -130,39 +174,30 @@ class ProjectTests(APITestCase):
 
         self.assertEqual(
             response.data["title"],
-            "Build a REST API",
+            "My Project",
         )
 
-    def test_project_owner_can_update_project(self):
-        self.authenticate(self.employer)
-
-        data = {
-            "title": "Updated REST API",
-            "description": "Updated description.",
-            "budget": "2000.00",
-            "deadline": str(
-                date.today() + timedelta(days=60)
-            ),
-            "is_remote": True,
-            "location": "",
-        }
-
-        response = self.client.put(
-            self.project_detail_url,
-            data,
-            format="json",
+    def test_freelancer_can_retrieve_project(self):
+        project = Project.objects.create(
+            employer=self.employer_profile,
+            title="Public Project",
+            description="Test description",
+            budget="1000.00",
+            deadline=date(2026, 12, 31),
         )
+
+        self.authenticate(self.freelancer)
+
+        url = reverse(
+            "project-detail",
+            kwargs={"pk": project.pk},
+        )
+
+        response = self.client.get(url)
 
         self.assertEqual(
             response.status_code,
             status.HTTP_200_OK,
-        )
-
-        self.project.refresh_from_db()
-
-        self.assertEqual(
-            self.project.title,
-            "Updated REST API",
         )
 
     def test_other_employer_cannot_update_project(self):
@@ -172,22 +207,31 @@ class ProjectTests(APITestCase):
             role=User.Role.EMPLOYER,
         )
 
+        EmployerProfile.objects.create(
+            user=other_employer,
+            company_name="Other Company",
+        )
+
+        project = Project.objects.create(
+            employer=self.employer_profile,
+            title="Original Project",
+            description="Original description",
+            budget="1000.00",
+            deadline=date(2026, 12, 31),
+        )
+
         self.authenticate(other_employer)
 
-        data = {
-            "title": "Hacked Project",
-            "description": "Should not be allowed.",
-            "budget": "5000.00",
-            "deadline": str(
-                date.today() + timedelta(days=60)
-            ),
-            "is_remote": True,
-            "location": "",
-        }
+        url = reverse(
+            "project-detail",
+            kwargs={"pk": project.pk},
+        )
 
-        response = self.client.put(
-            self.project_detail_url,
-            data,
+        response = self.client.patch(
+            url,
+            {
+                "title": "Hacked Project",
+            },
             format="json",
         )
 
@@ -196,12 +240,59 @@ class ProjectTests(APITestCase):
             status.HTTP_403_FORBIDDEN,
         )
 
-    def test_project_owner_can_delete_project(self):
+    def test_project_owner_can_update_project(self):
+        project = Project.objects.create(
+            employer=self.employer_profile,
+            title="Original Project",
+            description="Original description",
+            budget="1000.00",
+            deadline=date(2026, 12, 31),
+        )
+
         self.authenticate(self.employer)
 
-        response = self.client.delete(
-            self.project_detail_url
+        url = reverse(
+            "project-detail",
+            kwargs={"pk": project.pk},
         )
+
+        response = self.client.patch(
+            url,
+            {
+                "title": "Updated Project",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        project.refresh_from_db()
+
+        self.assertEqual(
+            project.title,
+            "Updated Project",
+        )
+
+    def test_project_owner_can_delete_project(self):
+        project = Project.objects.create(
+            employer=self.employer_profile,
+            title="Delete Me",
+            description="Test description",
+            budget="1000.00",
+            deadline=date(2026, 12, 31),
+        )
+
+        self.authenticate(self.employer)
+
+        url = reverse(
+            "project-detail",
+            kwargs={"pk": project.pk},
+        )
+
+        response = self.client.delete(url)
 
         self.assertEqual(
             response.status_code,
@@ -209,7 +300,5 @@ class ProjectTests(APITestCase):
         )
 
         self.assertFalse(
-            Project.objects.filter(
-                pk=self.project.pk
-            ).exists()
+            Project.objects.filter(pk=project.pk).exists()
         )
