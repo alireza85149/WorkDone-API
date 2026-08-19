@@ -1,5 +1,7 @@
 from rest_framework.permissions import BasePermission
 from apps.projects.models import Project
+from apps.proposals.models import Proposal
+from django.shortcuts import get_object_or_404
 class IsFreelancer(BasePermission):
     def has_permission(self, request, view):
         return request.user.role == 'freelancer'
@@ -11,5 +13,11 @@ class IsProposalOwner(BasePermission):
 class IsProjectOwner(BasePermission):
 
     def has_object_permission(self, request, view, object):
-        project = Project.objects.get(id = request.kwargs['project_id'])
+
+        if not view.kwargs['project_id']:
+            project_id = get_object_or_404(Proposal, pk = view.kwargs['pk']).project.id
+        else:
+            project_id = view.kwargs['project_id']
+
+        project = Project.objects.get(id = project_id)
         return request.user.emplyer_profile == project.employer

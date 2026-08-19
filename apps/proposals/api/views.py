@@ -1,5 +1,5 @@
 from .serializers import ProposalSerializer
-from rest_framework import generics, status
+from rest_framework import generics, status, serializers
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from apps.projects.models import Project
@@ -11,13 +11,29 @@ from apps.contracts.models  import Contract
 from django.utils import timezone
 from datetime import timedelta
 from django.db import transaction
+
 class ProposalCreateView(generics.CreateAPIView):
     serializer_class = ProposalSerializer   
     permission_classes = [IsAuthenticated, IsFreelancer]
     def perform_create(self, serializer):
 
-        project = Project.objects.get(pk = self.kwargs['project_id'])
+    project = get_object_or_404(
+        Project,
+        pk=self.kwargs["project_id"]
+    )
+        proposals = project.proposals.all()
 
+        is_duplicate = False
+
+        for p in proposals:
+            if p.freelancer == self.request.user.freelancer_profile:
+                is_duplicate = True
+                break
+
+        if is_duplicate:
+            raise serializers.ValidationError(
+                "You have already submitted a proposal for this project."
+            )
         serializer.save(project= project, freelancer = self.request.user.freelancer_profile)
 
 class ProposalEditView(generics.RetrieveUpdateDestroyAPIView):
