@@ -208,7 +208,7 @@ class ProposalTests(APITestCase):
         )
 
         self.assertEqual(
-            response.data["id"],
+            response.data[0]["id"],
             proposal.id,
         )
 

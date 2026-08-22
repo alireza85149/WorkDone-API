@@ -17,23 +17,21 @@ class ProposalCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated, IsFreelancer]
     def perform_create(self, serializer):
 
-    project = get_object_or_404(
-        Project,
-        pk=self.kwargs["project_id"]
-    )
-        proposals = project.proposals.all()
+        project = get_object_or_404(
+            Project,
+            pk=self.kwargs["project_id"]
+        )
 
-        is_duplicate = False
+        freelancer = self.request.user.freelancer_profile
 
-        for p in proposals:
-            if p.freelancer == self.request.user.freelancer_profile:
-                is_duplicate = True
-                break
+        if project.proposals.filter(
+            freelancer=freelancer
+        ).exists():
 
-        if is_duplicate:
             raise serializers.ValidationError(
                 "You have already submitted a proposal for this project."
             )
+
         serializer.save(project= project, freelancer = self.request.user.freelancer_profile)
 
 class ProposalEditView(generics.RetrieveUpdateDestroyAPIView):
@@ -41,7 +39,7 @@ class ProposalEditView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated, IsProposalOwner]
 
     def get_queryset(self):
-        return Proposal.objects.filter(freeelancer = self.request.user.freelancer_profile)
+        return Proposal.objects.filter(freelancer = self.request.user.freelancer_profile)
 
 class ProposalCheckView(generics.ListAPIView):
     serializer_class = ProposalSerializer
@@ -63,7 +61,13 @@ class ProposalAcceptOrRejectView(APIView):
                 {"message": "Proposal has already been processed."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
+        if proposal.project.status != Project.Status.OPEN:
+            return Response(
+                {"message": "This project is no longer open."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
         elif request.data.get('status') == Proposal.Status.ACCEPTED:
             proposal.status = Proposal.Status.ACCEPTED
             proposal.save()
